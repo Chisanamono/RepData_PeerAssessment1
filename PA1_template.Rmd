@@ -1,25 +1,66 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
+output:
   html_document:
-    keep_md: true
+    theme: journal
 ---
+Peer Assessment One
+===================
+## Loading and Processing Data
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
+```{r fig.path = "figures"}
+library(dplyr)
+activity <- read.csv("~/Documents/RepResearchProj/RepData_PeerAssessment1/activity.csv", stringsAsFactors=FALSE)
+activity <- tbl_df(activity)
+activity$date <- as.Date(activity$date)
+```
+## What is the mean total number of steps taken per day?
+```{r}
+activity.bydate <- group_by(activity, date)
+daily.steps <- summarise(activity.bydate, total.steps = sum(steps, na.rm = TRUE))
+with(daily.steps, hist(total.steps, main = "Total Daily Steps", xlab = ""))
+activity.stats <- summarise(activity.bydate, mean = mean(steps, na.rm = TRUE),
+                            median = median(steps, na.rm = TRUE))
+print(as.data.frame(activity.stats))
+```
 ## What is the average daily activity pattern?
-
-
-
+```{r}
+activity.byinterval <- group_by(activity, interval)
+activity.interval <- summarise(activity.byinterval, mean = mean(steps, 
+                                                                    na.rm = TRUE))
+with(activity.interval, plot(y = mean, x = interval, type = "l"))
+max.interval <- activity.interval$interval[which(activity.interval$mean == max(activity.interval$mean))]
+print(paste("The interval with the maximum number of steps is", max.interval))
+```
 ## Imputing missing values
-
-
-
+```{r}
+missing.values <- sum(is.na(activity))
+print(paste("There are", missing.values, "missing values in the original data set."))
+activity.imputed <- activity
+for (i in 1:nrow(activity.imputed)) {
+  if(is.na(activity.imputed$steps[i])) {
+    my.interval <- activity.imputed$interval[i]
+    activity.imputed$steps[i] <- activity.interval$mean[which(activity.interval$interval == my.interval)]
+  }
+}
+activity.im.bydate <- group_by(activity.imputed, date)
+activity.im.steps <- summarise(activity.im.bydate, total.steps = sum(steps))
+with(activity.im.steps, hist(total.steps, main = "Total Daily Steps", xlab = "After Step Estimation"))
+activity.im.stats <- summarise(activity.im.bydate, mean = mean(steps, na.rm = TRUE),
+                            median = median(steps, na.rm = TRUE))
+print(as.data.frame(activity.im.stats))
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+library(ggplot2)
+activity.im.days <- mutate(activity.imputed, day = weekdays(date))
+for (i in 1:nrow(activity.im.days)) {
+  if (activity.im.days$day[i]=="Saturday" | activity.im.days$day[i]=="Sunday") {
+    activity.im.days$day[i] <- "weekend"
+  } else {
+    activity.im.days$day[i] <- "weekday"
+  }
+}
+activity.im.days <- group_by(activity.im.days, day, interval)
+activity.im.days <- summarise(activity.im.days, mean.step = mean(steps))
+qplot(x = interval, y = mean.step, data = activity.im.days, facets = day~., geom="line")
+```
